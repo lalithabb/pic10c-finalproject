@@ -3,10 +3,8 @@ import sys
 import pandas as pd
 from shutil import copyfile
 import nltk
-nltk.download('punkt')
+# nltk.download('punkt')
 import numpy as np
-
-# def download_bbc_dataset():
     
 # transform dataset into a dataframe, parse text, and tokenize
 def prepare_bbc_dataset():
@@ -59,7 +57,6 @@ def prepare_bbc_dataset():
         tokentext.append(tokens)
     shuffled_df['raw_text'] = pd.Series(text)
     shuffled_df['tokens'] = pd.Series(tokentext)
-    # print(shuffled_df.head())
     return shuffled_df
 
 # calculates word count; this function 
@@ -67,38 +64,59 @@ def prepare_bbc_dataset():
 def countwords(df):
     # extend shuffled_df dataframe 
     word_list = []
-    for row in df[['filename', 'subdir', 'movedfilename', 'tokens']].iterrows():
-        rown = row[1]
-        for token in rown.tokens:
-            word_list.append((rown.filename, rown.subdir, rown.movedfilename, token))
-    word_table = pd.DataFrame(word_list, columns = ['filename', 'subdir', 'movedfilename', 'words'])
+    for row in df[['movedfilename', 'tokens']].iterrows():
+        rownum = row[1]
+        for token in rownum.tokens:
+            word_list.append((rownum.movedfilename, token))
+    word_table = pd.DataFrame(word_list, columns = ['movedfilename', 'words'])
     
     # word count
-    wordcount = word_table.groupby('movedfilename').words.value_counts().to_frame().rename(columns={'words':'nwords'})
-    print(wordcount.head())
-    return word_table
+    wordcount = word_table.groupby('movedfilename').words.value_counts().to_frame().rename(columns={'words':'termcounts'})
+    # print(wordcount.head())
+    return wordcount
 
 # calculates term frequency using the following equation: Tf = numwords/numtxtfiles
 # calculates inverse document frequency using the following equation: idf = log(totaldocs/(numdocs with term t))
-# assumes that the dataframe has the following columns: movedfilename, words, and nwords
-def calculate_tfidf(wordtable):
+# assumes that the incoming dataframe has the following columns: movedfilename, words, and nwords
+def calculate_tfidf(word_table):
+    # retrieve word count
+    wordtable = countwords(word_table)
+    
     # calculate term frequency
-    totalwords = wordtable.groupby(level=0).sum().rename(columns = {'nwords':'nfiles'})
+    totalwords = wordtable.groupby(level=0).sum().rename(columns = {'termcounts':'nwords'})
     termfrequency = wordtable.join(totalwords)
-    termfrequency['termfrequency'] = termfrequency.nwords/termfrequency.nfiles
-    print(termfrequency.head())
+    termfrequency['termfrequency'] = termfrequency.termcounts/termfrequency.nwords
     
-    # calculate inverse document frequency
-    # idf = wordtable.groupby('words').movedfilename.nunique().to_frame().rename(columns={'books':'id'}).sortvalues('id')
+    # document count
+    doc_count = len(totalwords)
     
+    # number of unique documents that each word appears in
+    idf_table = wordtable.reset_index(drop=False)
+    idf_table = idf_table.groupby('words').movedfilename.nunique().to_frame().rename(columns={'movedfilename':'nfiles_word'}).sort_values('nfiles_word')
     
+    # calculate idf
+    idf_table['idf'] = np.log(doc_count/idf_table.nfiles_word.values)
+    
+    # join term frequency and idf in dataframe
+    tfidf_table = termfrequency.join(idf_table)
+    tfidf_table['tf_idf'] = tfidf_table.termfrequency * tfidf_table.idf
+    tfidf_table = tfidf_table.reset_index(drop=False)
+    # sort tf_idf in descending order
+    tfidf_table = tfidf_table.groupby('movedfilename').apply(lambda x:x.sort_values('tf_idf', ascending=False))
+    # print(tfidf_table[tfidf_table['movedfilename'] == 'shuffleddata/2.txt'])
+    return tfidf_table
+    
+    # prepare tf_idf dataset
+    
+# initialize clusters
+def kmeans_initialization():
+    return
+
 # main function
 def main():
     shuffled_df = prepare_bbc_dataset()
-    # print(shuffled_df.head())
-    word_table = countwords(shuffled_df)
-    # print(word_table.head())
-    calculate_tfidf(word_table)
+    tfidf_table = calculate_tfidf(shuffled_df)
+    print(tfidf_table.head())
 
 # call main function
 if __name__ == "__main__":
