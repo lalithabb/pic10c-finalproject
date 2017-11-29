@@ -31,8 +31,8 @@ def prepare_bbc_dataset():
     dataframe = pd.DataFrame({'subdir': dirlist, 'filename': filelist})
     # print(dataframe)
     
-    # randomly shuffle all rows in dataframe and reindex
-    shuffled_df = dataframe.sample(frac=1)
+    # randomly shuffle all rows (set seed to 1) in dataframe and reindex
+    shuffled_df = dataframe.sample(frac=1, random_state=1)
     shuffled_df['movedfilename'] = range(1, len(shuffled_df) + 1)
     # converting int to string 
     shuffled_df['movedfilename'] = shuffled_df['movedfilename'].astype(str)
@@ -104,9 +104,12 @@ def calculate_tfidf(word_table):
     # sort tf_idf in descending order
     tfidf_table = tfidf_table.groupby('movedfilename').apply(lambda x:x.sort_values('tf_idf', ascending=False))
     # print(tfidf_table[tfidf_table['movedfilename'] == 'shuffleddata/2.txt'])
-    return tfidf_table
     
     # prepare tf_idf dataset
+    #convert tf_idf table to dictionary
+    tfidf_dataset = tfidf_table.groupby('movedfilename').apply(lambda x: dict(zip(x['words'], x['tf_idf']))).reset_index().rename(columns={0:'tfidf'})
+    # tfidf_dataset = tfidf_dataset.merge(tfidf_dataset, word_table, on='movedfilename', how='inner')
+    return tfidf_dataset
     
 # initialize clusters
 def kmeans_initialization():
