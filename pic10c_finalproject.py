@@ -161,7 +161,6 @@ def df_to_sparse_matrix(df, column_name):
     return row_indices
     
 def reformat_tfidf_table(tfidf_table):
-    #NEED TO MOVE ALL OF THIS INTO a function that returns tfidf_dataset and then you can form the sparse matrix.
     wordindex, indexword = dict_to_index_table(tfidf_table['tfidf'])
     lens=[len(item) for item in tfidf_table['tfidf']]
     tfidf_table['rownum'] = pd.Series(range(len(tfidf_table)))
