@@ -121,47 +121,50 @@ def calculate_tfidf(word_table):
 
 # Syntactic sugar for converting a set of dictionary keys to numeric indices 
 # and vice versa
-def dict_to_index_table (di):
-    ''' do, dor = dict_to_index_table(di)
-    
-    Input parameters: 
-        di:  Dictionary; e.g. {'a': 'John', 'b': 'Mary' ...}
-        
-    Output: 
-        do: Dictionary; e.g. {'a': 0, 'b': 1, ...} 
-        dor: Reverse dictionary; e.g. {0: 'a', 1:'b', ...}
-        
-    This function takes a dictionary and returns a mapping from the 
-    dictionary keys to a set of numeric indices in the range of the length 
-    of the dictionary. 
-    
-    '''
-    doi = list({k for d in di for k in d.keys()})
-    do = {x:i for i,x in enumerate(doi)}
-    dor = {i:x for i,x in enumerate(do)}
-    return do, dor
+#def dict_to_index_table (di):
+#    ''' do, dor = dict_to_index_table(di)
+#    
+#    Input parameters: 
+#        di:  Dictionary; e.g. {'a': 'John', 'b': 'Mary' ...}
+#        
+#    Output: 
+#        do: Dictionary; e.g. {'a': 0, 'b': 1, ...} 
+#        dor: Reverse dictionary; e.g. {0: 'a', 1:'b', ...}
+#        
+#    This function takes a dictionary and returns a mapping from the 
+#    dictionary keys to a set of numeric indices in the range of the length 
+#    of the dictionary. 
+#    
+#    '''
+#    doi = list({k for d in di for k in d.keys()})
+#    do = {x:i for i,x in enumerate(doi)}
+#    dor = {i:x for i,x in enumerate(do)}
+#    return do, dor
  
-def df_to_sparse_matrix(df, column_name):
-    ''' tfidf_numeric, wordmap, indexmap = \
-                df_to_sparse_matrix(df, dict_column, wordindex)
-        
-        Input Parameters:
-            df          : tfidf dataset with tfidf in a dictionary in column_name
-            column_name : Column spec that has the tfidf values for each word
-            
-        Output:
-            tfidf_numeric    : sparse matrix of tfidf values
-            map_index_to_word: dictionary of indices mapping to word
-            
-        This function returns a sparse matrix of TF-IDF values and returns a 
-        map from indices to words. The rows correspond to the rows of the 
-        dataframe while the columns are the words in each document.
-    '''
-    row_indices = range(len(df))
-    map_word_to_index, map_index_to_word = dict_to_index_table(df[column_name])
-    
-    return row_indices
-    
+#def df_to_sparse_matrix(df, column_name):
+#    ''' tfidf_numeric, wordmap, indexmap = \
+#                df_to_sparse_matrix(df, dict_column, wordindex)
+#        
+#        Input Parameters:
+#            df          : tfidf dataset with tfidf in a dictionary in column_name
+#            column_name : Column spec that has the tfidf values for each word
+#            
+#        Output:
+#            tfidf_numeric    : sparse matrix of tfidf values
+#            map_index_to_word: dictionary of indices mapping to word
+#            
+#        This function returns a sparse matrix of TF-IDF values and returns a 
+#        map from indices to words. The rows correspond to the rows of the 
+#        dataframe while the columns are the words in each document.
+#    '''
+#    row_indices = range(len(df))
+#    map_word_to_index, map_index_to_word = dict_to_index_table(df[column_name])
+#    
+#    return row_indices
+ 
+# reformat the tfidf_dataset to have proper information for creation of sparse matrix
+# input: tfidf_dataset created in calculate_tfidf()
+# output: dataset with columns: # of columns, original file path, # of rows, tfidf value, word
 def reformat_tfidf_table(tfidf_table):
     wordindex, indexword = dict_to_index_table(tfidf_table['tfidf'])
     lens=[len(item) for item in tfidf_table['tfidf']]
@@ -176,7 +179,8 @@ def reformat_tfidf_table(tfidf_table):
                                 'tfidf': tfidf_table.tfidf.apply(lambda x: pd.Series([v for v in list(x.values())]))\
                                 .stack()\
                                 .reset_index(level=1, drop=True)})
-    tfidf_dataset['word'] = tfidf_dataset.colnum.apply(lambda x: indexword[x])  
+    tfidf_dataset['word'] = tfidf_dataset.colnum.apply(lambda x: indexword[x]) 
+    print(tfidf_dataset.head())
     return tfidf_dataset         
 
 #reduce dictionary to top 10 unique words from each text file
@@ -187,6 +191,8 @@ def reformat_tfidf_table(tfidf_table):
     #return n_items
 
 # convert the dataframe into a sparse matrix (which has a lot of zero-entires and a few nonzero-entries, identifies row_index, col_index, and value of nonzero-entries alone)
+# input: tfidf_dataset from reformat_tfidf_table()
+# output: sparse matrix containing tfidf values
 def create_sparse_matrix(tfidf_dataset):
     # convert rows into an array
     row = np.array(tfidf_dataset['rownum'])
@@ -231,6 +237,7 @@ tfidf_table = calculate_tfidf(shuffled_df)
 tfidf_dataset = reformat_tfidf_table(tfidf_table)
 tfidf_matrix = create_sparse_matrix(tfidf_dataset)
 init_centroids = initialize_centroids(tfidf_matrix, 5, seed=1)
+clustAssignment = assign_clusters(tfidf_matrix, init_centroids)
 
 
 #print(tfidf_dataset.head())
