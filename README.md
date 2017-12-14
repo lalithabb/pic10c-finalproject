@@ -17,6 +17,9 @@ The idea is to classify the themes of documents using k-means clustering.
 Program description:
 This program parses the words in the BBC text files, formats them, calculates the term frequency-inverse document frequency (TF-IDF), creates a sparse matrix, and performs k-means analysis on them. K-Means is a clustering algorithm that assigns cluster centers, or centroids, to classify similar values (in this case TF-IDF values). The algorithm aims to reduce cluster heterogeneity, and thus create tightly knit clusters of words. Formulas for tf-idf can be found in the comments above the calculate_tfidf() function. Further definitions and descriptions of the sparse matrix and other functions can also be found in the program comments.
 
+Connections to C++:
+The data is stored in containers, namely lists and dictionaries (which are equivalent to the std::map in C++). The preprocessing steps use a combination of generic algorithms (such as groupby, sort, etc.) and lambda functions to structure the data for easy analysis. These algorithms underlyingly use iterators to traverse through the containers.
+
 Progress:
 The formatting of text files and calculation of the TF-IDF took much longer than I expected, so I was not able to really manually code the k-means algorithm - instead I relied on libraries available in Python. If I had more time, I could have “manually” created the sparse matrix and performed the functions for k-means.
 
