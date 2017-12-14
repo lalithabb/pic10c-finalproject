@@ -9,7 +9,7 @@ If you do wish to download the original dataset, it can be found here: http://ml
 Under the ‘Datasets: BBC’ section, click on ‘Download raw text files’.
 
 The data:
-The BBC dataset contains raw text files sorted into one of 5 categories: politics, business, sports, entertainment, and tech. 
+The BBC dataset contains raw text files sorted into one of 5 categories: politics, business, sports, entertainment, and tech. The first function (prepare_bbc_dataset()) moves all the text files out of these directories and randomly shuffles them in order to reclassify them later on.
 
 Goal:
 The idea is to classify the themes of documents using k-means clustering.
