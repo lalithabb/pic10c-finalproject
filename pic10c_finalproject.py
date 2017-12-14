@@ -6,12 +6,14 @@ from shutil import copyfile
 import nltk
 # nltk.download('punkt')
 import numpy as np
-import time
 
 #packages for k-means clustering
 from scipy.sparse import csr_matrix
 from sklearn.preprocessing import normalize
 from sklearn.metrics import pairwise_distances
+
+#for visualization of results
+# from sklearn.cluster import KMeans
     
 # transform dataset into a dataframe, parse text, and tokenize
 def prepare_bbc_dataset():
@@ -65,6 +67,7 @@ def prepare_bbc_dataset():
         tokentext.append(tokens)
     shuffled_df['raw_text'] = pd.Series(text)
     shuffled_df['tokens'] = pd.Series(tokentext)
+    print(shuffled_df.head())
     return shuffled_df
 
 # calculates word count; this function 
@@ -80,7 +83,7 @@ def countwords(df):
     
     # word count
     wordcount = word_table.groupby('movedfilename').words.value_counts().to_frame().rename(columns={'words':'termcounts'})
-    # print(wordcount.head())
+    print(wordcount.head())
     return wordcount
 
 # calculates term frequency using the following equation: Tf = numwords/numtxtfiles
@@ -117,50 +120,30 @@ def calculate_tfidf(word_table):
     #convert tf_idf table to dictionary
     tfidf_dataset = tfidf_table.groupby('movedfilename').apply(lambda x: dict(zip(x['words'], x['tf_idf']))).reset_index().rename(columns={0:'tfidf'})
     # tfidf_dataset = tfidf_dataset.merge(tfidf_dataset, word_table, on='movedfilename', how='inner')
+    print(tfidf_dataset.head())
     return tfidf_dataset
 
-# Syntactic sugar for converting a set of dictionary keys to numeric indices 
-# and vice versa
-#def dict_to_index_table (di):
-#    ''' do, dor = dict_to_index_table(di)
-#    
-#    Input parameters: 
-#        di:  Dictionary; e.g. {'a': 'John', 'b': 'Mary' ...}
-#        
-#    Output: 
-#        do: Dictionary; e.g. {'a': 0, 'b': 1, ...} 
-#        dor: Reverse dictionary; e.g. {0: 'a', 1:'b', ...}
-#        
-#    This function takes a dictionary and returns a mapping from the 
-#    dictionary keys to a set of numeric indices in the range of the length 
-#    of the dictionary. 
-#    
-#    '''
-#    doi = list({k for d in di for k in d.keys()})
-#    do = {x:i for i,x in enumerate(doi)}
-#    dor = {i:x for i,x in enumerate(do)}
-#    return do, dor
- 
-#def df_to_sparse_matrix(df, column_name):
-#    ''' tfidf_numeric, wordmap, indexmap = \
-#                df_to_sparse_matrix(df, dict_column, wordindex)
-#        
-#        Input Parameters:
-#            df          : tfidf dataset with tfidf in a dictionary in column_name
-#            column_name : Column spec that has the tfidf values for each word
-#            
-#        Output:
-#            tfidf_numeric    : sparse matrix of tfidf values
-#            map_index_to_word: dictionary of indices mapping to word
-#            
-#        This function returns a sparse matrix of TF-IDF values and returns a 
-#        map from indices to words. The rows correspond to the rows of the 
-#        dataframe while the columns are the words in each document.
-#    '''
-#    row_indices = range(len(df))
-#    map_word_to_index, map_index_to_word = dict_to_index_table(df[column_name])
-#    
-#    return row_indices
+ # Syntactic sugar for converting a set of dictionary keys to numeric indices 
+ # and vice versa
+def dict_to_index_table (di):
+    ''' do, dor = dict_to_index_table(di)
+    
+    Input parameters: 
+        di:  Dictionary; e.g. {'a': 'John', 'b': 'Mary' ...}
+        
+    Output: 
+        do: Dictionary; e.g. {'a': 0, 'b': 1, ...} 
+        dor: Reverse dictionary; e.g. {0: 'a', 1:'b', ...}
+        
+    This function takes a dictionary and returns a mapping from the 
+    dictionary keys to a set of numeric indices in the range of the length 
+    of the dictionary. 
+    
+    '''
+    doi = list({k for d in di for k in d.keys()})
+    do = {x:i for i,x in enumerate(doi)}
+    dor = {i:x for i,x in enumerate(do)}
+    return do, dor
  
 # reformat the tfidf_dataset to have proper information for creation of sparse matrix
 # input: tfidf_dataset created in calculate_tfidf()
@@ -203,6 +186,7 @@ def create_sparse_matrix(tfidf_dataset):
     colnum = max(tfidf_dataset['colnum']) + 1
     tfidf_matrix = csr_matrix((tfidf, (row, col)), shape=(rownum, colnum))
     tfidf_matrix = normalize(tfidf_matrix)
+    print(tfidf_matrix)
     return tfidf_matrix
 
 # this function randomly initializes k centroids to cluster the rest of the data around
@@ -218,6 +202,7 @@ def initialize_centroids(tfidf, k, seed=None):
     # randomly pick 5 centroid values between 0 and n
     randomk = np.random.randint(0, n, k)
     centroids = tfidf[randomk,:].toarray()
+    print(centroids)
     return centroids
 
 # this function assigns data values to clusters by calculating the euclidean distance between each centroid/value pair
@@ -228,7 +213,57 @@ def assign_clusters(tfidf, centroids):
     distFromCentroid = pairwise_distances(tfidf, centroids, metric='euclidean')
     #returns indices of the closest values to each centroid
     clustAssignment = np.argmin(distFromCentroid, axis=1)
+    print(clustAssignment)
     return clustAssignment
+
+# reassign each centroid to the mean of all the cluster datapoints
+# input: tfidf sparse matrix, number of centroids, cluster assignment from assign_clusters()
+# output: new centroids
+def revise_centroids(tfidf, k, clustAssignment):
+    newCentroids = []
+    for i in range(k):
+        member_data_points = tfidf[clustAssignment==i]
+        # calculate mean of data
+        centroid = member_data_points.mean(axis=0)
+        # convert matrix to array
+        centroid = centroid.A1
+        newCentroids.append(centroid)
+    newCentroids = np.array(newCentroids)
+    print(newCentroids)
+    return newCentroids
+
+# initializes, assigns, and revises clusters; checks for cluster convergence
+# input: tfidf sparse matrix, number of centroids, number of iterations, verbose=True prints changed data points 
+def kmeans(tfidf, k, init_centroids, iterations, verbose=False):
+    '''This function runs k-means on given data and initial set of centroids.
+       maxiter: maximum number of iterations to run.
+       verbose: if True, print how many data points changed their cluster labels in each iteration'''
+    centroids = init_centroids[:]
+    prev_assignment = None
+    
+    for iter in range(iterations):        
+        if verbose:
+            print(iter)
+        # call assign_clusters()
+        clust_assignment = assign_clusters(tfidf, centroids)
+        # call revise_centroids()
+        centroids = revise_centroids(tfidf, k, clust_assignment)
+        # check for cluster convergence
+        if prev_assignment is not None and \
+          (prev_assignment==clust_assignment).all():
+            break
+        if prev_assignment is not None:
+            num_changed = np.sum(prev_assignment!=clust_assignment)
+            if verbose:
+                print('{0:5d} changed cluster assignments.'.format(num_changed))   
+        prev_assignment = clust_assignment[:]
+    print(centroids)
+    print(clust_assignment)
+    return centroids, clust_assignment
+
+#def plot_clusters(tfidf_matrix, centroids, clust_assignment):
+#    
+#    return
 
 # main function
 #def main():
@@ -237,7 +272,9 @@ tfidf_table = calculate_tfidf(shuffled_df)
 tfidf_dataset = reformat_tfidf_table(tfidf_table)
 tfidf_matrix = create_sparse_matrix(tfidf_dataset)
 init_centroids = initialize_centroids(tfidf_matrix, 5, seed=1)
-clustAssignment = assign_clusters(tfidf_matrix, init_centroids)
+clust_assignment = assign_clusters(tfidf_matrix, init_centroids)
+revised_centroids = revise_centroids(tfidf_matrix, 5, clust_assignment)
+centroids, clust_assignment = kmeans(tfidf_matrix, 5, init_centroids, 3, verbose=True)
 
 
 #print(tfidf_dataset.head())
