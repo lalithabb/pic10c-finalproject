@@ -199,158 +199,30 @@ def create_sparse_matrix(tfidf_dataset):
     tfidf_matrix = normalize(tfidf_matrix)
     return tfidf_matrix
 
+# this function randomly initializes k centroids to cluster the rest of the data around
+# input: tfidf: sparse matrix with tfidf values, k: number of desired centroids, and random seed 
+# output: an array of initial centroids
 def initialize_centroids(tfidf, k, seed=None):
-    '''Randomly choose k data points as initial centroids'''
-    if seed is not None: # useful for obtaining consistent results
+    #the goal is to randomly choose k data values as the centroids
+    #in this case, k will be 5 because there were 5 original themes in the bbc dataset
+    if seed is not None: # used for debugging purposes - can set seed to not None to achieve consistent results
         np.random.seed(seed)
-    n = tfidf.shape[0] # number of data points 
-    # pick K indices from range [0, N).
-    rand_indices = np.random.randint(0, n, k)
-    centroids = tfidf[rand_indices,:].toarray()
+    # set n equal to number of data values in tfidf sparse matrix
+    n = tfidf.shape[0]  
+    # randomly pick 5 centroid values between 0 and n
+    randomk = np.random.randint(0, n, k)
+    centroids = tfidf[randomk,:].toarray()
     return centroids
 
+# this function assigns data values to clusters by calculating the euclidean distance between each centroid/value pair
+# input: tfidf sparse matrix, centroids calculated in initialize_centroids() function
+# output: assigned clusters
 def assign_clusters(tfidf, centroids):
-    #calculate distance from each data point to each centroid
+    # use euclidean distance to determine how far each data value is from each centroid
     distFromCentroid = pairwise_distances(tfidf, centroids, metric='euclidean')
-    #cluster assignments for each data point
+    #returns indices of the closest values to each centroid
     clustAssignment = np.argmin(distFromCentroid, axis=1)
     return clustAssignment
-
-def revise_centroids(tfidf, k, cluster_assignment):
-    new_centroids = []
-    for i in range(k):
-        # Select all data points that belong to cluster i. Fill in the blank (RHS only)
-        member_data_points = tfidf[cluster_assignment==i]
-        # Compute the mean of the data points. Fill in the blank (RHS only)
-        centroid = member_data_points.mean(axis=0)
-        
-        # Convert numpy.matrix type to numpy.ndarray type
-        centroid = centroid.A1
-        new_centroids.append(centroid)
-    new_centroids = np.array(new_centroids)
-    return new_centroids
-
-def compute_heterogeneity(tfidf, k, centroids, cluster_assignment):
-    
-    heterogeneity = 0.0
-    for i in range(k):
-        
-        # Select all data points that belong to cluster i. Fill in the blank (RHS only)
-        member_data_points = tfidf[cluster_assignment==i, :]
-        
-        if member_data_points.shape[0] > 0: # check if i-th cluster is non-empty
-            # Compute distances from centroid to data points (RHS only)
-            distances = pairwise_distances(member_data_points, [centroids[i]], metric='euclidean')
-            squared_distances = distances**2
-            heterogeneity += np.sum(squared_distances) 
-    return heterogeneity
-
-def kmeans(tfidf, k, initial_centroids, maxiter, record_heterogeneity=None, verbose=False):
-    '''This function runs k-means on given data and initial set of centroids.
-       maxiter: maximum number of iterations to run.
-       record_heterogeneity: (optional) a list, to store the history of heterogeneity as function of iterations
-                             if None, do not store the history.
-       verbose: if True, print how many data points changed their cluster labels in each iteration'''
-    centroids = initial_centroids[:]
-    prev_cluster_assignment = None
-    
-    for itr in range(maxiter):        
-        if verbose:
-            print(itr)
-        
-        # 1. Make cluster assignments using nearest centroids
-        cluster_assignment = assign_clusters(tfidf, centroids)
-
-            
-        # 2. Compute a new centroid for each of the k clusters, averaging all data points assigned to that cluster.
-        centroids = revise_centroids(tfidf, k, cluster_assignment)
-            
-        # Check for convergence: if none of the assignments changed, stop
-        if prev_cluster_assignment is not None and \
-          (prev_cluster_assignment==cluster_assignment).all():
-            break
-        
-        # Print number of new assignments 
-        if prev_cluster_assignment is not None:
-            num_changed = np.sum(prev_cluster_assignment!=cluster_assignment)
-            if verbose:
-                print('    {0:5d} elements changed their cluster assignment.'.format(num_changed))   
-        
-        # Record heterogeneity convergence metric
-        if record_heterogeneity is not None:
-            score = compute_heterogeneity(tfidf, k, centroids, cluster_assignment)
-            record_heterogeneity.append(score)
-        
-        prev_cluster_assignment = cluster_assignment[:]
-        
-    return centroids, cluster_assignment
-
-#now initialize centroids in a nonrandom manner
-def smart_initialize(tfidf, k, seed=None):
-    if seed is not None: # useful for obtaining consistent results
-        np.random.seed(seed)
-    centroids = np.zeros((k, tfidf.shape[1]))
-    
-    # Randomly choose the first centroid.
-    idx = np.random.randint(tfidf.shape[0])
-    centroids[0] = tfidf[idx,:].toarray()
-    # Compute distances from the first centroid chosen to all the other data points
-    squared_distances = pairwise_distances(tfidf, centroids[0:1], metric='euclidean').flatten()**2
-    
-    for i in range(1, k):
-        # Choose the next centroid randomly, so that the probability for each data point to be chosen
-        # is directly proportional to its squared distance from the nearest centroid.
-        # Roughtly speaking, a new centroid should be as far as from ohter centroids as possible.
-        idx = np.random.choice(tfidf.shape[0], 1, p=squared_distances/sum(squared_distances))
-        centroids[i] = tfidf[idx,:].toarray()
-        # Now compute distances from the centroids to all data points
-        squared_distances = np.min(pairwise_distances(tfidf, centroids[0:i+1], metric='euclidean')**2,axis=1)
-    return centroids
-
-def kmeans_multiple_runs(tfidf, k, maxiter, num_runs, seed_list=None, verbose=False):
-    heterogeneity = {}
-    
-    min_heterogeneity_achieved = float('inf')
-    best_seed = None
-    final_centroids = None
-    final_cluster_assignment = None
-    
-    for i in range(num_runs):
-        
-        # Use UTC time if no seeds are provided 
-        if seed_list is not None: 
-            seed = seed_list[i]
-            np.random.seed(seed)
-        else: 
-            seed = int(time.time())
-            np.random.seed(seed)
-        
-        # Use k-means++ initialization
-        initial_centroids = initialize_centroids(tfidf, k, seed)
-        
-        # Run k-means
-        centroids, cluster_assignment = kmeans(tfidf, k, initial_centroids, maxiter,
-                                           record_heterogeneity=None, verbose=False)
-        
-        # To save time, compute heterogeneity only once in the end
-        heterogeneity[seed] = compute_heterogeneity(tfidf, k, centroids, cluster_assignment)
-        
-        if verbose:
-            print('seed={0:06d}, heterogeneity={1:.5f}'.format(seed, heterogeneity[seed]))
-            sys.stdout.flush()
-        
-        # if current measurement of heterogeneity is lower than previously seen,
-        # update the minimum record of heterogeneity.
-        if heterogeneity[seed] < min_heterogeneity_achieved:
-            min_heterogeneity_achieved = heterogeneity[seed]
-            # best_seed = seed
-            final_centroids = centroids
-            final_cluster_assignment = cluster_assignment
-    
-    # Return the centroids and cluster assignments that minimize heterogeneity.
-    return final_centroids, final_cluster_assignment
-
-
 
 # main function
 #def main():
@@ -359,9 +231,6 @@ tfidf_table = calculate_tfidf(shuffled_df)
 tfidf_dataset = reformat_tfidf_table(tfidf_table)
 tfidf_matrix = create_sparse_matrix(tfidf_dataset)
 init_centroids = initialize_centroids(tfidf_matrix, 5, seed=1)
-clustAssignment = assign_clusters(tfidf_matrix, init_centroids)
-#print(type(tfidf_matrix))
-smartInit = smart_initialize(tfidf_matrix, 5, seed=1)
 
 
 #print(tfidf_dataset.head())
