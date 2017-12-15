@@ -4,6 +4,7 @@
 The idea is to classify the themes of documents using k-means clustering.
 
 Please read below for updates made after the making of the video.
+
 **Link to youtube video explanation of project: https://youtu.be/zYJkn0ypwFc
 
 **Installation requirements (included in program):**
