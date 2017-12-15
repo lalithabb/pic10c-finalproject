@@ -235,9 +235,6 @@ def revise_centroids(tfidf, k, clustAssignment):
 # initializes, assigns, and revises clusters; checks for cluster convergence
 # input: tfidf sparse matrix, number of centroids, number of iterations, verbose=True prints changed data points 
 def kmeans(tfidf, k, init_centroids, iterations, verbose=False):
-    '''This function runs k-means on given data and initial set of centroids.
-       maxiter: maximum number of iterations to run.
-       verbose: if True, print how many data points changed their cluster labels in each iteration'''
     centroids = init_centroids[:]
     prev_assignment = None
     
