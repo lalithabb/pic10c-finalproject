@@ -1,4 +1,4 @@
-# H1 PIC10C Project Description
+# PIC10C Project Description
 
 Please read below for updates made after the making of the video.
 **Link to youtube video explanation of project: https://youtu.be/zYJkn0ypwFc
