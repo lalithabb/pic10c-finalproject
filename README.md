@@ -1,5 +1,7 @@
 README.md
 
+Link to youtube video explanation of project: https://youtu.be/zYJkn0ypwFc
+
 Installation requirements (included in program):
 This program requires installation of 1) Python 3, 2) the Natural Language Toolkit, and 3) the BBC raw text dataset. Use of the BBC dataset included in this repository is recommended, as one character in BBC/sport/199.txt was change to comply with ASCII encoding (£ was changed to ‘pound’). 
 
