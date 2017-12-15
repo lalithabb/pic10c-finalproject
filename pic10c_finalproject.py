@@ -19,8 +19,8 @@ from sklearn.metrics import pairwise_distances
 # returns "shuffled" BBC dataset
 def prepare_bbc_dataset():
     # set working directory
-    dataset_dir = 'bbcss'
-    #dataset_dir = 'bbc'
+    #dataset_dir = 'bbcss'
+    dataset_dir = 'bbc'
 
     # create empty lists
     dirlist = []
@@ -43,7 +43,7 @@ def prepare_bbc_dataset():
     # print(dataframe)
     
     # randomly shuffle all rows (set seed to 1) in dataframe and reindex
-    shuffled_df = dataframe.sample(frac=1, random_state=1)
+    shuffled_df = dataframe.sample(frac=1, random_state=1).reset_index()
     shuffled_df['movedfilename'] = range(1, len(shuffled_df) + 1)
     # converting int to string 
     shuffled_df['movedfilename'] = shuffled_df['movedfilename'].astype(str)
@@ -68,7 +68,7 @@ def prepare_bbc_dataset():
         tokentext.append(tokens)
     shuffled_df['raw_text'] = pd.Series(text)
     shuffled_df['tokens'] = pd.Series(tokentext)
-    print(shuffled_df.head())
+    # print(shuffled_df.head())
     return shuffled_df
 
 # calculates word count; this function 
@@ -84,7 +84,7 @@ def countwords(df):
     
     # word count
     wordcount = word_table.groupby('movedfilename').words.value_counts().to_frame().rename(columns={'words':'termcounts'})
-    print(wordcount.head())
+    # print(wordcount.head())
     return wordcount
 
 # calculates term frequency using the following equation: Tf = numwords/numtxtfiles
@@ -113,15 +113,11 @@ def calculate_tfidf(word_table):
     tfidf_table = termfrequency.join(idf_table)
     tfidf_table['tf_idf'] = tfidf_table.termfrequency * tfidf_table.idf
     tfidf_table = tfidf_table.reset_index(drop=False)
-    # sort tf_idf in descending order
-    # tfidf_table = tfidf_table.groupby('movedfilename').apply(lambda x:x.sort_values('tf_idf', ascending=False))
-    # print(tfidf_table[tfidf_table['movedfilename'] == 'shuffleddata/2.txt'])
-    # tfidf_table = tfidf_table.reset_index(drop=False)
     # prepare tf_idf dataset
     #convert tf_idf table to dictionary
     tfidf_dataset = tfidf_table.groupby('movedfilename').apply(lambda x: dict(zip(x['words'], x['tf_idf']))).reset_index().rename(columns={0:'tfidf'})
     # tfidf_dataset = tfidf_dataset.merge(tfidf_dataset, word_table, on='movedfilename', how='inner')
-    print(tfidf_dataset.head())
+    # print(tfidf_dataset.head())
     return tfidf_dataset
 
  # Syntactic sugar for converting a set of dictionary keys to numeric indices 
@@ -164,7 +160,7 @@ def reformat_tfidf_table(tfidf_table):
                                 .stack()\
                                 .reset_index(level=1, drop=True)})
     tfidf_dataset['word'] = tfidf_dataset.colnum.apply(lambda x: indexword[x]) 
-    print(tfidf_dataset.head())
+    #print(tfidf_dataset.head())
     return tfidf_dataset         
 
 #reduce dictionary to top 10 unique words from each text file
@@ -187,7 +183,7 @@ def create_sparse_matrix(tfidf_dataset):
     colnum = max(tfidf_dataset['colnum']) + 1
     tfidf_matrix = csr_matrix((tfidf, (row, col)), shape=(rownum, colnum))
     tfidf_matrix = normalize(tfidf_matrix)
-    print(tfidf_matrix)
+    #print(tfidf_matrix)
     return tfidf_matrix
 
 # this function randomly initializes k centroids to cluster the rest of the data around
@@ -203,7 +199,7 @@ def initialize_centroids(tfidf, k, seed=None):
     # randomly pick 5 centroid values between 0 and n
     randomk = np.random.randint(0, n, k)
     centroids = tfidf[randomk,:].toarray()
-    print(centroids)
+    #print(centroids)
     return centroids
 
 # this function assigns data values to clusters by calculating the euclidean distance between each centroid/value pair
@@ -214,7 +210,7 @@ def assign_clusters(tfidf, centroids):
     distFromCentroid = pairwise_distances(tfidf, centroids, metric='euclidean')
     #returns indices of the closest values to each centroid
     clustAssignment = np.argmin(distFromCentroid, axis=1)
-    print(clustAssignment)
+    #print(clustAssignment)
     return clustAssignment
 
 # reassign each centroid to the mean of all the cluster datapoints
@@ -230,7 +226,7 @@ def revise_centroids(tfidf, k, clustAssignment):
         centroid = centroid.A1
         newCentroids.append(centroid)
     newCentroids = np.array(newCentroids)
-    print(newCentroids)
+    #print(newCentroids)
     return newCentroids
 
 # initializes, assigns, and revises clusters; checks for cluster convergence
@@ -256,35 +252,33 @@ def kmeans(tfidf, k, init_centroids, iterations, verbose=False):
             if verbose:
                 print('{0:5d} changed cluster assignments.'.format(num_changed))   
         prev_assignment = clust_assignment[:]
-    print(centroids)
-    print(clust_assignment)
-    return centroids, clust_assignment
-
-#def plot_clusters(tfidf_matrix, centroids, clust_assignment):
-#    
-#    return
+    #print(centroids)
+    #print(clust_assignment)
+    
+    #find closest data point to each centroid
+    distFromCentroid = pairwise_distances(tfidf, centroids, metric='euclidean')
+    bestrow = np.argmin(distFromCentroid, axis=0)
+    
+    return centroids, clust_assignment, bestrow
 
 # main function
-#def main():
-shuffled_df = prepare_bbc_dataset()
-tfidf_table = calculate_tfidf(shuffled_df)
-tfidf_dataset = reformat_tfidf_table(tfidf_table)
-tfidf_matrix = create_sparse_matrix(tfidf_dataset)
-init_centroids = initialize_centroids(tfidf_matrix, 5, seed=1)
-clust_assignment = assign_clusters(tfidf_matrix, init_centroids)
-revised_centroids = revise_centroids(tfidf_matrix, 5, clust_assignment)
-centroids, clust_assignment = kmeans(tfidf_matrix, 5, init_centroids, 3, verbose=True)
-
-
-#print(tfidf_dataset.head())
-
-#reduced_tfidf = reduce_dictionary(tfidf_table, 10)
-#print(reduced_tfidf.head())
-#sparse_tfidf = df_to_sparse_matrix(tfidf_table, tfidf)
+def main():
+    shuffled_df = prepare_bbc_dataset()
+    tfidf_table = calculate_tfidf(shuffled_df)
+    tfidf_dataset = reformat_tfidf_table(tfidf_table)
+    tfidf_matrix = create_sparse_matrix(tfidf_dataset)
+    init_centroids = initialize_centroids(tfidf_matrix, 5, seed=1)
+    # the kmeans function calls the following
+#    clust_assignment = assign_clusters(tfidf_matrix, init_centroids)
+#    revised_centroids = revise_centroids(tfidf_matrix, 5, clust_assignment)
+    centroids, clust_assignment, bestrow = kmeans(tfidf_matrix, 5, init_centroids, 3, verbose=True)
+    # print cluster themes
+    for k in range(bestrow.shape[0]):
+        print(shuffled_df[shuffled_df.movedfilename == tfidf_table.loc[k].movedfilename]['subdir'])
 
 # call main function
-#if __name__ == "__main__":
-#    main()
+if __name__ == "__main__":
+    main()
 
 
 
