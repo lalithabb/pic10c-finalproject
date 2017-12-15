@@ -15,7 +15,8 @@ from sklearn.metrics import pairwise_distances
 #for visualization of results
 # from sklearn.cluster import KMeans
     
-# transform dataset into a dataframe, parse text, and tokenize
+# transform dataset into a dataframe, parse text, and tokenize (using nltk)
+# returns "shuffled" BBC dataset
 def prepare_bbc_dataset():
     # set working directory
     dataset_dir = 'bbcss'
@@ -234,6 +235,7 @@ def revise_centroids(tfidf, k, clustAssignment):
 
 # initializes, assigns, and revises clusters; checks for cluster convergence
 # input: tfidf sparse matrix, number of centroids, number of iterations, verbose=True prints changed data points 
+# modeled after UofWash kmeans clustering explanation
 def kmeans(tfidf, k, init_centroids, iterations, verbose=False):
     centroids = init_centroids[:]
     prev_assignment = None
