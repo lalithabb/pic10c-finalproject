@@ -1,5 +1,8 @@
 # PIC10C Project Description
 
+**Goal:**
+The idea is to classify the themes of documents using k-means clustering.
+
 Please read below for updates made after the making of the video.
 **Link to youtube video explanation of project: https://youtu.be/zYJkn0ypwFc
 
@@ -13,9 +16,6 @@ Under the ‘Datasets: BBC’ section, click on ‘Download raw text files’.
 
 **The data:**
 The BBC dataset contains raw text files sorted into one of 5 categories: politics, business, sports, entertainment, and tech. The first function (prepare_bbc_dataset()) moves all the text files out of these directories and randomly shuffles them in order to reclassify them later on.
-
-**Goal:**
-The idea is to classify the themes of documents using k-means clustering.
 
 **Program description:**
 This program parses the words in the BBC text files, formats them, calculates the term frequency-inverse document frequency (TF-IDF), creates a sparse matrix, and performs k-means analysis on them. K-Means is a clustering algorithm that assigns cluster centers, or centroids, to classify similar values (in this case TF-IDF values). The algorithm aims to reduce cluster heterogeneity, and thus create tightly knit clusters of words. Formulas for tf-idf can be found in the comments above the calculate_tfidf() function. Further definitions and descriptions of the sparse matrix and other functions can also be found in the program comments.
